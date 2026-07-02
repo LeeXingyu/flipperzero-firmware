@@ -2,8 +2,8 @@
 
 #include <furi_hal.h>
 
-#define CONTRAST_ERC 18
-#define CONTRAST_MGG 18
+#define CONTRAST_ERC 20
+#define CONTRAST_MGG 20
 
 uint8_t u8g2_gpio_and_delay_stm32(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_ptr) {
     UNUSED(u8x8);
