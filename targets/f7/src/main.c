@@ -10,7 +10,7 @@ int main(void) {
     furi_init();
 
     furi_hal_init_early();
-    // furi_hal_init();
+    furi_hal_init();
     //flipper_init();
 
     // furi_hal_power_enable_external_3_3v();
