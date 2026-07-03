@@ -2,8 +2,8 @@
 setlocal
 
 rem Build firmware artifacts including HEX for the current firmware configuration.
-rem Default target is F18 because that is what this workspace is using now.
-set "TARGET_HW=18"
+rem Default target is F7 for compatibility testing. Override with TARGET_HW=18 if needed.
+set "TARGET_HW=7"
 set "SCONS_ARGS="
 
 :parse_args

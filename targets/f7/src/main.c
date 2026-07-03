@@ -4,6 +4,7 @@
 #include <furi_hal_spi_config.h>
 #include <furi_hal_serial_control.h>
 #include <furi_hal_cortex.h>
+#include <furi_hal_subghz.h>
 #include <cc1101.h>
 #include <string.h>
 #include <gui/canvas.h>
@@ -19,8 +20,13 @@
 #define ENABLE_CC1101_TEST      1
 #define ENABLE_CC1101_RX_TEST   1
 #define ENABLE_CC1101_RAW_PROBE 1
+#define ENABLE_CC1101_SIGNAL_FILTER 1
 
 #define CC1101_RX_FREQUENCY 433920000U
+#define CC1101_EDGE_DELTA_THRESHOLD    6U
+#define CC1101_RSSI_ABS_THRESHOLD_DBM   (-60.0f)
+#define CC1101_RSSI_DELTA_THRESHOLD_DB  8.0f
+#define CC1101_RSSI_BASELINE_SAMPLES    5U
 
 static const uint8_t cc1101_ook_650khz_async_regs[] = {
     CC1101_IOCFG0,
@@ -120,118 +126,24 @@ typedef struct {
     uint8_t pos;
 } LcdTestContext;
 
-static const GpioPin cc1101_board_g0 = {.port = GPIOA, .pin = LL_GPIO_PIN_1};
-static const GpioPin cc1101_board_cs = {.port = GPIOD, .pin = LL_GPIO_PIN_0};
-static const GpioPin cc1101_board_miso = {.port = GPIOB, .pin = LL_GPIO_PIN_4};
-static const GpioPin cc1101_board_mosi = {.port = GPIOB, .pin = LL_GPIO_PIN_5};
-static const GpioPin cc1101_board_sck = {.port = GPIOA, .pin = LL_GPIO_PIN_5};
-
 static volatile uint32_t cc1101_rx_edge_count = 0;
 static volatile uint32_t cc1101_rx_last_duration_us = 0;
-static volatile uint32_t cc1101_rx_last_edge_cyccnt = 0;
 static volatile bool cc1101_rx_last_level = false;
 
-static const FuriHalSpiBusHandle cc1101_board_spi;
-
-static void cc1101_board_g0_exti_callback(void* context) {
-    UNUSED(context);
-
-    static uint32_t low_start_cyccnt = 0;
-    static bool have_low_start = false;
-    const bool level = furi_hal_gpio_read(&cc1101_board_g0);
-    const uint32_t now = DWT->CYCCNT;
-
-    cc1101_rx_last_level = level;
-    cc1101_rx_last_edge_cyccnt = now;
-    cc1101_rx_edge_count++;
-
-    if(level) {
-        if(have_low_start) {
-            cc1101_rx_last_duration_us =
-                (now - low_start_cyccnt) / furi_hal_cortex_instructions_per_microsecond();
-        }
-    } else {
-        low_start_cyccnt = now;
-        have_low_start = true;
-    }
-}
-
 static void cc1101_board_load_preset(const uint8_t* preset_data) {
-    uint32_t i = 0;
-    while(preset_data[i]) {
-        cc1101_write_reg(&cc1101_board_spi, preset_data[i], preset_data[i + 1]);
-        i += 2;
-    }
-
-    uint8_t pa[8] = {0};
-    memcpy(pa, &preset_data[i + 2], sizeof(pa));
-    cc1101_set_pa_table(&cc1101_board_spi, pa);
+    furi_hal_subghz_load_custom_preset(preset_data);
 }
 
 static float cc1101_board_get_rssi_dbm(void) {
-    int32_t rssi_raw = cc1101_get_rssi(&cc1101_board_spi);
-    float rssi = rssi_raw;
-
-    if(rssi_raw >= 128) {
-        rssi = ((rssi - 256.0f) / 2.0f) - 74.0f;
-    } else {
-        rssi = (rssi / 2.0f) - 74.0f;
-    }
-
-    return rssi;
+    return furi_hal_subghz_get_rssi();
 }
 
-static void cc1101_board_spi_handle_event_callback(
-    const FuriHalSpiBusHandle* handle,
-    FuriHalSpiBusHandleEvent event) {
-    if(event == FuriHalSpiBusHandleEventInit) {
-        furi_hal_gpio_write(handle->cs, true);
-        furi_hal_gpio_init(handle->cs, GpioModeOutputPushPull, GpioPullNo, GpioSpeedVeryHigh);
-    } else if(event == FuriHalSpiBusHandleEventDeinit) {
-        furi_hal_gpio_write(handle->cs, true);
-        furi_hal_gpio_init(handle->cs, GpioModeAnalog, GpioPullNo, GpioSpeedLow);
-    } else if(event == FuriHalSpiBusHandleEventActivate) {
-        LL_SPI_Init(handle->bus->spi, (LL_SPI_InitTypeDef*)&furi_hal_spi_preset_1edge_low_8m);
-        LL_SPI_SetRxFIFOThreshold(handle->bus->spi, LL_SPI_RX_FIFO_TH_QUARTER);
-        LL_SPI_Enable(handle->bus->spi);
-
-        furi_hal_gpio_init_ex(
-            handle->miso,
-            GpioModeAltFunctionPushPull,
-            GpioPullNo,
-            GpioSpeedVeryHigh,
-            GpioAltFn5SPI1);
-        furi_hal_gpio_init_ex(
-            handle->mosi,
-            GpioModeAltFunctionPushPull,
-            GpioPullNo,
-            GpioSpeedVeryHigh,
-            GpioAltFn5SPI1);
-        furi_hal_gpio_init_ex(
-            handle->sck,
-            GpioModeAltFunctionPushPull,
-            GpioPullNo,
-            GpioSpeedVeryHigh,
-            GpioAltFn5SPI1);
-
-        furi_hal_gpio_write(handle->cs, false);
-    } else if(event == FuriHalSpiBusHandleEventDeactivate) {
-        furi_hal_gpio_write(handle->cs, true);
-        furi_hal_gpio_init(handle->miso, GpioModeAnalog, GpioPullNo, GpioSpeedLow);
-        furi_hal_gpio_init(handle->mosi, GpioModeAnalog, GpioPullNo, GpioSpeedLow);
-        furi_hal_gpio_init(handle->sck, GpioModeAnalog, GpioPullNo, GpioSpeedLow);
-        LL_SPI_Disable(handle->bus->spi);
-    }
+static void cc1101_board_capture_callback(bool level, uint32_t duration, void* context) {
+    UNUSED(context);
+    cc1101_rx_last_level = level;
+    cc1101_rx_last_duration_us = duration;
+    cc1101_rx_edge_count++;
 }
-
-static const FuriHalSpiBusHandle cc1101_board_spi = {
-    .bus = &furi_hal_spi_bus_r,
-    .callback = cc1101_board_spi_handle_event_callback,
-    .miso = &cc1101_board_miso,
-    .mosi = &cc1101_board_mosi,
-    .sck = &cc1101_board_sck,
-    .cs = &cc1101_board_cs,
-};
 
 static int32_t lcd_test_thread(void* context) {
 #if ENABLE_LCD_TEST
@@ -247,87 +159,66 @@ static int32_t lcd_test_thread(void* context) {
 
 #if ENABLE_CC1101_TEST
     {
-        furi_hal_gpio_init(&cc1101_board_g0, GpioModeAnalog, GpioPullNo, GpioSpeedLow);
-        FURI_LOG_I(TAG, "furi_hal_gpio_init ended");
-        furi_hal_spi_bus_handle_init(&cc1101_board_spi);
-        FURI_LOG_I(TAG, "furi_hal_spi_bus_handle_init ended");
-        furi_hal_bus_enable(FuriHalBusSPI1);
-        FURI_LOG_I(TAG, "FuriHalBusSPI1 enabled");
-        cc1101_board_spi.bus->current_handle = &cc1101_board_spi;
-        cc1101_board_spi.callback(&cc1101_board_spi, FuriHalSpiBusHandleEventActivate);
-        FURI_LOG_I(TAG, "cc1101 spi handle activated");
-        cc1101_reset(&cc1101_board_spi);
-        FURI_LOG_I(TAG, "ENABLE_CC1101_cc1101_reset started");
-        CC1101StatusRaw status = {.status = cc1101_get_status(&cc1101_board_spi)};
-        uint8_t partnumber = cc1101_get_partnumber(&cc1101_board_spi);
-        uint8_t version = cc1101_get_version(&cc1101_board_spi);
-        FURI_LOG_I(
-            TAG,
-            "CC1101 status raw=0x%02X state=%u rdyn=%u",
-            status.status_raw,
-            status.status.STATE,
-            status.status.CHIP_RDYn);
-        FURI_LOG_I(TAG, "CC1101 raw partnumber=0x%02X version=0x%02X", partnumber, version);
-
-        if((partnumber == CC1101_EXPECTED_PARTNUMBER) && (version == CC1101_EXPECTED_VERSION)) {
-            FURI_LOG_I(TAG, "CC1101 board detected");
-            FURI_LOG_I(TAG, "CC1101 board chip %u, version %u", partnumber, version);
-        } else {
-            FURI_LOG_E(TAG, "CC1101 board not detected");
-        }
-
-#if ENABLE_CC1101_RX_TEST
-        cc1101_reset(&cc1101_board_spi);
-        FURI_LOG_I(TAG, "CC1101 RX test reset done");
+        FURI_LOG_I(TAG, "CC1101 HAL init");
+        furi_hal_subghz_init();
+        FURI_LOG_I(TAG, "CC1101 HAL ready");
 
         cc1101_board_load_preset(cc1101_ook_650khz_async_regs);
         FURI_LOG_I(TAG, "CC1101 OOK async preset loaded");
 
-        cc1101_set_frequency(&cc1101_board_spi, CC1101_RX_FREQUENCY);
-        FURI_LOG_I(TAG, "CC1101 frequency set to %lu Hz", (unsigned long)CC1101_RX_FREQUENCY);
+        uint32_t real_frequency = furi_hal_subghz_set_frequency(CC1101_RX_FREQUENCY);
+        FURI_LOG_I(TAG, "CC1101 frequency set to %lu Hz", (unsigned long)real_frequency);
 
-        furi_hal_gpio_add_int_callback(&cc1101_board_g0, cc1101_board_g0_exti_callback, NULL);
-        furi_hal_gpio_write(&cc1101_board_g0, true);
-        furi_hal_gpio_init(&cc1101_board_g0, GpioModeInterruptRiseFall, GpioPullNo, GpioSpeedLow);
-        furi_hal_gpio_enable_int_callback(&cc1101_board_g0);
-        FURI_LOG_I(TAG, "CC1101 GDO0 interrupt armed");
-
-        cc1101_switch_to_rx(&cc1101_board_spi);
-        FURI_LOG_I(TAG, "CC1101 switched to RX");
+        furi_hal_subghz_start_async_rx(cc1101_board_capture_callback, NULL);
+        FURI_LOG_I(TAG, "CC1101 async RX started");
 
         uint32_t last_edge_count = 0;
+        float rssi_baseline_sum = 0.0f;
+        float rssi_baseline = 0.0f;
+        uint32_t rssi_baseline_count = 0;
         while(true) {
             uint32_t edge_count = cc1101_rx_edge_count;
             float rssi = cc1101_board_get_rssi_dbm();
+            uint32_t edge_delta = edge_count - last_edge_count;
 
-            if(edge_count != last_edge_count) {
-                last_edge_count = edge_count;
-                FURI_LOG_I(
-                    TAG,
-                    "433.92MHz activity edges=%lu last_level=%u last_pulse=%luus rssi=%.1fdBm",
-                    (unsigned long)edge_count,
-                    (unsigned int)cc1101_rx_last_level,
-                    (unsigned long)cc1101_rx_last_duration_us,
-                    (double)rssi);
+            if(rssi_baseline_count < CC1101_RSSI_BASELINE_SAMPLES) {
+                rssi_baseline_sum += rssi;
+                rssi_baseline_count++;
+                if(rssi_baseline_count == CC1101_RSSI_BASELINE_SAMPLES) {
+                    rssi_baseline = rssi_baseline_sum / (float)CC1101_RSSI_BASELINE_SAMPLES;
+                    FURI_LOG_I(TAG, "CC1101 idle RSSI baseline=%.1fdBm", (double)rssi_baseline);
+                }
             } else {
-                FURI_LOG_I(
-                    TAG,
-                    "433.92MHz idle edges=%lu last_pulse=%luus rssi=%.1fdBm",
-                    (unsigned long)edge_count,
-                    (unsigned long)cc1101_rx_last_duration_us,
-                    (double)rssi);
+                bool strong_rssi = (rssi >= CC1101_RSSI_ABS_THRESHOLD_DBM) ||
+                                   ((rssi - rssi_baseline) >= CC1101_RSSI_DELTA_THRESHOLD_DB);
+                bool edge_burst = edge_delta >= CC1101_EDGE_DELTA_THRESHOLD;
+
+                if(ENABLE_CC1101_SIGNAL_FILTER && (strong_rssi || edge_burst)) {
+                    FURI_LOG_I(
+                        TAG,
+                        "433.92MHz possible signal edges=%lu(+%lu) last_level=%u last_pulse=%luus rssi=%.1fdBm baseline=%.1fdBm",
+                        (unsigned long)edge_count,
+                        (unsigned long)edge_delta,
+                        (unsigned int)cc1101_rx_last_level,
+                        (unsigned long)cc1101_rx_last_duration_us,
+                        (double)rssi,
+                        (double)rssi_baseline);
+                } else {
+                    FURI_LOG_D(
+                        TAG,
+                        "433.92MHz idle edges=%lu(+%lu) last_pulse=%luus rssi=%.1fdBm baseline=%.1fdBm",
+                        (unsigned long)edge_count,
+                        (unsigned long)edge_delta,
+                        (unsigned long)cc1101_rx_last_duration_us,
+                        (double)rssi,
+                        (double)rssi_baseline);
+                }
             }
+
+            last_edge_count = edge_count;
 
             furi_delay_ms(1000);
         }
-#endif
-
-        cc1101_board_spi.callback(&cc1101_board_spi, FuriHalSpiBusHandleEventDeactivate);
-        cc1101_board_spi.bus->current_handle = NULL;
-        furi_hal_bus_disable(FuriHalBusSPI1);
-        FURI_LOG_I(TAG, "cc1101 spi handle deactivated");
-        furi_hal_spi_bus_handle_deinit(&cc1101_board_spi);
-        FURI_LOG_I(TAG, "furi_hal_spi_bus_handle_deinit ended");
     }
 #endif
 

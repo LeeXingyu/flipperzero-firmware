@@ -6,6 +6,10 @@
 
 #define TAG "FuriHal"
 
+#ifndef ENABLE_FURI_HAL_SUBGHZ_INIT
+#define ENABLE_FURI_HAL_SUBGHZ_INIT 0
+#endif
+
 void furi_hal_init_early(void) {
     furi_hal_cortex_init_early();
     furi_hal_clock_init_early();
@@ -49,13 +53,15 @@ void furi_hal_init(void) {
     // furi_hal_i2c_init();
     // furi_hal_power_init();
     // furi_hal_light_init();
-    // furi_hal_bt_init();
+    furi_hal_bt_init();
     furi_hal_memory_init();
 
 #ifndef FURI_RAM_EXEC
     furi_hal_usb_init();
     // furi_hal_vibro_init();
-    // furi_hal_subghz_init();
+    #if ENABLE_FURI_HAL_SUBGHZ_INIT
+    furi_hal_subghz_init();
+    #endif
     // furi_hal_nfc_init();
     // furi_hal_rfid_init();
 #endif
