@@ -1,15 +1,12 @@
 #include <furi.h>
 #include <furi_hal.h>
-#include <furi_hal_serial.h>
 #include <furi_hal_serial_control.h>
 #include <gui/canvas.h>
 #include <gui/canvas_i.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <string.h>
 
 // 1 = use u8g2 directly
 // 2 = use GUI/Canvas direct draw
+#define TAG                     "LcdTest"
 #define LCD_RENDER_BACKEND_U8G2 1
 #define LCD_RENDER_BACKEND_GUI  2
 
@@ -25,54 +22,18 @@
 #endif
 
 typedef struct {
-    FuriHalSerialHandle* serial;
     uint32_t counter;
     uint8_t pos;
 } LcdTestContext;
-
-static void lcd_test_serial_init(LcdTestContext* ctx) {
-    ctx->serial = furi_hal_serial_control_acquire(FuriHalSerialIdUsart);
-    if(!ctx->serial) {
-        ctx->serial = furi_hal_serial_control_acquire(FuriHalSerialIdLpuart);
-    }
-
-    if(ctx->serial) {
-        furi_hal_serial_init(ctx->serial, 115200);
-        furi_hal_serial_configure_framing(
-            ctx->serial, FuriHalSerialDataBits8, FuriHalSerialParityNone, FuriHalSerialStopBits1);
-    }
-}
-
-static void lcd_test_serial_write(LcdTestContext* ctx, const char* text) {
-    if(ctx->serial && text) {
-        furi_hal_serial_tx(ctx->serial, (const uint8_t*)text, strlen(text));
-    }
-}
-
-static void lcd_test_serial_writef(LcdTestContext* ctx, const char* fmt, ...) {
-    if(!ctx->serial) return;
-
-    char line[64];
-    va_list args;
-    va_start(args, fmt);
-    int len = vsnprintf(line, sizeof(line), fmt, args);
-    va_end(args);
-
-    if(len > 0) {
-        furi_hal_serial_tx(ctx->serial, (const uint8_t*)line, (size_t)len);
-    }
-}
 
 static int32_t lcd_test_thread(void* context) {
     furi_assert(context);
     LcdTestContext* ctx = context;
 
     furi_hal_init();
-    furi_hal_serial_control_set_logging_config(FuriHalSerialIdMax, 115200);
+    furi_hal_serial_control_set_logging_config(FuriHalSerialIdUsart, 115200);
 
     furi_delay_ms(200);
-
-    lcd_test_serial_init(ctx);
 
 #if LCD_RENDER_BACKEND == LCD_RENDER_BACKEND_U8G2
     u8g2_t u8g2;
@@ -80,11 +41,11 @@ static int32_t lcd_test_thread(void* context) {
     u8g2_InitDisplay(&u8g2);
     u8g2_SetPowerSave(&u8g2, 0);
 
-    lcd_test_serial_write(ctx, "Serial LCD test started (u8g2)\r\n");
+    FURI_LOG_I(TAG, "Serial LCD test started (u8g2)");
 #elif LCD_RENDER_BACKEND == LCD_RENDER_BACKEND_GUI
     Canvas* canvas = canvas_init();
 
-    lcd_test_serial_write(ctx, "Serial LCD test started (gui)\r\n");
+    FURI_LOG_I(TAG, "Serial LCD test started (gui)");
 #endif
 
     while(true) {
@@ -113,8 +74,7 @@ static int32_t lcd_test_thread(void* context) {
         canvas_commit(canvas);
 #endif
 
-        lcd_test_serial_writef(
-            ctx, "counter=%lu pos=%u\r\n", (unsigned long)ctx->counter, (unsigned int)ctx->pos);
+        FURI_LOG_I(TAG, "counter=%lu pos=%u", (unsigned long)ctx->counter, (unsigned int)ctx->pos);
 
         ctx->pos += 4;
         if(ctx->pos > 88) {
@@ -137,7 +97,6 @@ int main(void) {
     furi_hal_init_early();
 
     LcdTestContext* context = malloc(sizeof(LcdTestContext));
-    context->serial = NULL;
     context->counter = 0;
     context->pos = 0;
 
