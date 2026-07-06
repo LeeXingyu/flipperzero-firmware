@@ -1,5 +1,4 @@
 #include "input.h"
-
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -8,7 +7,6 @@
 #include <toolbox/cli/cli_command.h>
 #include <cli/cli_main_commands.h>
 #include <toolbox/pipe.h>
-
 #define INPUT_DEBOUNCE_TICKS_HALF (INPUT_DEBOUNCE_TICKS / 2)
 #define INPUT_PRESS_TICKS         150
 #define INPUT_LONG_PRESS_COUNTS   2
@@ -83,7 +81,6 @@ const char* input_get_type_name(InputType type) {
 
 int32_t input_srv(void* p) {
     UNUSED(p);
-
     const FuriThreadId thread_id = furi_thread_get_current_id();
     FuriPubSub* event_pubsub = furi_pubsub_alloc();
     uint32_t counter = 1;
@@ -101,7 +98,6 @@ int32_t input_srv(void* p) {
 #endif
 
     InputPinState pin_states[input_pins_count];
-
     for(size_t i = 0; i < input_pins_count; i++) {
         furi_hal_gpio_add_int_callback(input_pins[i].gpio, input_isr, thread_id);
         pin_states[i].pin = &input_pins[i];
@@ -168,6 +164,5 @@ int32_t input_srv(void* p) {
             furi_thread_flags_wait(INPUT_THREAD_FLAG_ISR, FuriFlagWaitAny, FuriWaitForever);
         }
     }
-
     return 0;
 }

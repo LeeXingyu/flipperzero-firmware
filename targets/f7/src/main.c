@@ -7,6 +7,7 @@
 #include <furi_hal_subghz.h>
 #include <gui/canvas.h>
 #include <gui/gui.h>
+#include <input/input.h>
 #include <lib/subghz/devices/cc1101_configs.h>
 
 #define TAG "LcdTest"
@@ -15,6 +16,7 @@
 #define ENABLE_BT_TEST     0
 #define ENABLE_CC1101_TEST 1
 #define ENABLE_RAW_GUI_TEST 1
+#define ENABLE_KEY_TEST    1
 
 #define CC1101_FREQ_HZ              433920000UL
 #define CC1101_SIGNAL_THRESHOLD_DBM (-50.0f)
@@ -32,6 +34,10 @@ typedef struct {
     volatile uint8_t rssi_current;
     volatile uint8_t rssi_write;
     volatile bool rssi_history_full;
+#if ENABLE_KEY_TEST
+    volatile uint32_t key_event_count;
+    volatile bool exit_requested;
+#endif
 } LcdTestState;
 
 static uint8_t lcd_raw_map_rssi(float rssi) {
@@ -133,6 +139,29 @@ static void lcd_draw_callback(Canvas* canvas, void* context) {
 #endif
 }
 
+#if ENABLE_KEY_TEST
+static void lcd_input_events_callback(const void* message, void* context) {
+    furi_assert(message);
+    furi_assert(context);
+
+    const InputEvent* event = message;
+    LcdTestState* state = context;
+
+    state->key_event_count++;
+    FURI_LOG_I(
+        TAG,
+        "Key event #%lu: %s %s",
+        (unsigned long)state->key_event_count,
+        input_get_key_name(event->key),
+        input_get_type_name(event->type));
+
+    if((event->key == InputKeyBack) && (event->type == InputTypeLong)) {
+        state->exit_requested = true;
+        FURI_LOG_I(TAG, "Back long pressed, exit requested");
+    }
+}
+#endif
+
 static int32_t lcd_test_thread(void* context) {
     UNUSED(context);
     furi_hal_init();
@@ -146,6 +175,14 @@ static int32_t lcd_test_thread(void* context) {
         .last_duration_us = 0,
         .last_level = false,
         .idle_baseline_rssi = -127.0f,
+        .rssi_history = {0},
+        .rssi_current = 0,
+        .rssi_write = 0,
+        .rssi_history_full = false,
+#if ENABLE_KEY_TEST
+        .key_event_count = 0,
+        .exit_requested = false,
+#endif
     };
 
     ViewPort* view_port = view_port_alloc();
@@ -170,6 +207,29 @@ static int32_t lcd_test_thread(void* context) {
     gui_add_view_port(gui, view_port, GuiLayerFullscreen);
     FURI_LOG_I(TAG, "GUI ready");
 
+#if ENABLE_KEY_TEST
+    FuriPubSub* input_events = NULL;
+    for(uint32_t i = 0; i < 100U; i++) {
+        if(furi_record_exists(RECORD_INPUT_EVENTS)) {
+            input_events = furi_record_open(RECORD_INPUT_EVENTS);
+            break;
+        }
+        furi_delay_ms(10);
+    }
+
+    if(!input_events) {
+        FURI_LOG_W(TAG, "Input events not ready");
+        gui_remove_view_port(gui, view_port);
+        furi_record_close(RECORD_GUI);
+        view_port_free(view_port);
+        return 0;
+    }
+
+    FuriPubSubSubscription* input_subscription =
+        furi_pubsub_subscribe(input_events, lcd_input_events_callback, &state);
+    FURI_LOG_I(TAG, "Input events ready");
+#endif
+
 #if ENABLE_CC1101_TEST
     FURI_LOG_I(TAG, "CC1101 HAL init");
     furi_hal_subghz_init();
@@ -191,6 +251,12 @@ static int32_t lcd_test_thread(void* context) {
     uint32_t baseline_count = 0;
 
     while(true) {
+        
+#if ENABLE_KEY_TEST
+        if(state.exit_requested) {
+            break;
+        }
+#endif
         state.rssi = furi_hal_subghz_get_rssi();
         state.signal_active = (state.rssi > CC1101_SIGNAL_THRESHOLD_DBM);
 
@@ -230,6 +296,10 @@ static int32_t lcd_test_thread(void* context) {
     gui_remove_view_port(gui, view_port);
     furi_record_close(RECORD_GUI);
     view_port_free(view_port);
+#if ENABLE_KEY_TEST
+    furi_pubsub_unsubscribe(input_events, input_subscription);
+    furi_record_close(RECORD_INPUT_EVENTS);
+#endif
     return 0;
 }
 
