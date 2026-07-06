@@ -525,24 +525,32 @@ void gui_direct_draw_release(Gui* gui) {
 
 Gui* gui_alloc(void) {
     Gui* gui = malloc(sizeof(Gui));
+    FURI_LOG_I(TAG, "gui_alloc started");
     // Thread ID
     gui->thread_id = furi_thread_get_current_id();
     // Allocate mutex
     gui->mutex = furi_mutex_alloc(FuriMutexTypeNormal);
+    FURI_LOG_I(TAG, "gui mutex allocated");
 
     // Layers
     for(size_t i = 0; i < GuiLayerMAX; i++) {
         ViewPortArray_init(gui->layers[i]);
     }
+    FURI_LOG_I(TAG, "gui layers initialized");
 
     // Drawing canvas
     gui->canvas = canvas_init();
+    FURI_LOG_I(TAG, "gui canvas initialized");
 
     // Input
     gui->input_queue = furi_message_queue_alloc(8, sizeof(InputEvent));
+    FURI_LOG_I(TAG, "gui input queue allocated");
+    FURI_LOG_I(TAG, "gui waiting for input events record");
     gui->input_events = furi_record_open(RECORD_INPUT_EVENTS);
+    FURI_LOG_I(TAG, "gui input events record opened");
 
     furi_pubsub_subscribe(gui->input_events, gui_input_events_callback, gui);
+    FURI_LOG_I(TAG, "gui input events subscribed");
 
     return gui;
 }

@@ -2,12 +2,12 @@
 #include "check.h"
 #include "mutex.h"
 #include "event_flag.h"
-
+#include "log.h"
 #include <m-dict.h>
 #include <toolbox/m_cstr_dup.h>
 
 #define FURI_RECORD_FLAG_READY (0x1)
-
+#define TAG                    "FuriRecord"
 typedef struct {
     FuriEventFlag* flags;
     void* data;
@@ -45,6 +45,7 @@ void furi_record_init(void) {
 static FuriRecordData* furi_record_data_get_or_create(const char* name) {
     furi_check(furi_record);
     FuriRecordData* record_data = furi_record_get(name);
+    FURI_LOG_W(TAG, "furi_record_get");
     if(!record_data) {
         FuriRecordData new_record;
         new_record.flags = furi_event_flag_alloc();
@@ -67,12 +68,13 @@ static void furi_record_unlock(void) {
 bool furi_record_exists(const char* name) {
     furi_check(furi_record);
     furi_check(name);
-
+    FURI_LOG_W(TAG, "furi_check(name)");
     bool ret = false;
 
     furi_record_lock();
     ret = (furi_record_get(name) != NULL);
     furi_record_unlock();
+    FURI_LOG_W(TAG, "furi_record_get(name) %d", ret);
 
     return ret;
 }
