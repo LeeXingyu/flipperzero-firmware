@@ -5,23 +5,36 @@
 #include <furi_hal_resources.h>
 #include <furi_hal_serial_control.h>
 #include <furi_hal_subghz.h>
+#include <furi_hal_bt.h>
 #include <gui/canvas.h>
 #include <gui/gui.h>
 #include <input/input.h>
+#include <storage/storage.h>
 #include <lib/subghz/devices/cc1101_configs.h>
 
 #define TAG "LcdTest"
 
-#define ENABLE_GUI_TEST    1
-#define ENABLE_BT_TEST     0
-#define ENABLE_CC1101_TEST 1
-#define ENABLE_RAW_GUI_TEST 1
-#define ENABLE_KEY_TEST    1
+#define ENABLE_GUI_TEST     0
+#define ENABLE_BT_TEST      0
+#define ENABLE_CC1101_TEST  0
+#define ENABLE_RAW_GUI_TEST 0
+#define ENABLE_KEY_TEST     0
+#define ENABLE_FLIPPER_TEST 1
 
 #define CC1101_FREQ_HZ              433920000UL
 #define CC1101_SIGNAL_THRESHOLD_DBM (-50.0f)
 #define RAW_GUI_HISTORY_SIZE        100
 #define RAW_GUI_THRESHOLD_MIN       (-90.0f)
+
+#if ENABLE_BT_TEST
+#include <bt/bt_service/bt_keys_filename.h>
+#include <bt/bt_service/bt_keys_storage.h>
+#include <profiles/serial_profile.h>
+
+#ifndef BT_KEYS_STORAGE_PATH
+#define BT_KEYS_STORAGE_PATH INT_PATH(BT_KEYS_STORAGE_FILE_NAME)
+#endif
+#endif
 
 typedef struct {
     volatile bool signal_active;
@@ -40,6 +53,26 @@ typedef struct {
 #endif
 } LcdTestState;
 
+#if ENABLE_BT_TEST
+static bool bt_test_gap_event_callback(GapEvent event, void* context) {
+    UNUSED(context);
+
+    switch(event.type) {
+    case GapEventTypeStartAdvertising:
+        FURI_LOG_I(TAG, "BLE advertising started");
+        break;
+    case GapEventTypeStopAdvertising:
+        FURI_LOG_I(TAG, "BLE advertising stopped");
+        break;
+    default:
+        break;
+    }
+
+    return true;
+}
+#endif
+
+#if ENABLE_RAW_GUI_TEST
 static uint8_t lcd_raw_map_rssi(float rssi) {
     if(rssi < RAW_GUI_THRESHOLD_MIN) {
         return 0;
@@ -50,7 +83,9 @@ static uint8_t lcd_raw_map_rssi(float rssi) {
     if(value > 34.0f) value = 34.0f;
     return (uint8_t)value;
 }
+#endif
 
+#if ENABLE_CC1101_TEST
 static void lcd_capture_callback(bool level, uint32_t duration_us, void* context) {
     furi_assert(context);
 
@@ -59,7 +94,9 @@ static void lcd_capture_callback(bool level, uint32_t duration_us, void* context
     state->last_level = level;
     state->last_duration_us = duration_us;
 }
+#endif
 
+#if ENABLE_RAW_GUI_TEST
 static void lcd_raw_add_rssi_sample(LcdTestState* state, float rssi) {
     uint8_t sample = lcd_raw_map_rssi(rssi);
     state->rssi_current = sample;
@@ -99,11 +136,7 @@ static void lcd_draw_raw_graph(Canvas* canvas, const LcdTestState* state) {
         }
 
         canvas_draw_line(
-            canvas,
-            graph_left + x,
-            graph_bottom,
-            graph_left + x,
-            graph_bottom - sample);
+            canvas, graph_left + x, graph_bottom, graph_left + x, graph_bottom - sample);
     }
 
     const uint8_t threshold_y =
@@ -117,7 +150,8 @@ static void lcd_draw_raw_graph(Canvas* canvas, const LcdTestState* state) {
     canvas_draw_str(canvas, 126, 40, "RSSI");
     canvas_set_font_direction(canvas, CanvasDirectionLeftToRight);
 }
-
+#endif
+#if ENABLE_CC1101_TEST
 static void lcd_draw_callback(Canvas* canvas, void* context) {
     furi_assert(canvas);
     furi_assert(context);
@@ -138,6 +172,7 @@ static void lcd_draw_callback(Canvas* canvas, void* context) {
     lcd_draw_raw_graph(canvas, state);
 #endif
 }
+#endif
 
 #if ENABLE_KEY_TEST
 static void lcd_input_events_callback(const void* message, void* context) {
@@ -167,6 +202,12 @@ static int32_t lcd_test_thread(void* context) {
     furi_hal_init();
     flipper_init();
     FURI_LOG_I(TAG, "Main started");
+#if ENABLE_FLIPPER_TEST
+    furi_background();
+#else
+#if ENABLE_BT_TEST
+    BtKeysStorage* bt_keys = NULL;
+#endif
 
     LcdTestState state = {
         .signal_active = false,
@@ -206,6 +247,24 @@ static int32_t lcd_test_thread(void* context) {
 
     gui_add_view_port(gui, view_port, GuiLayerFullscreen);
     FURI_LOG_I(TAG, "GUI ready");
+
+#if ENABLE_BT_TEST
+    furi_check(furi_hal_bt_start_radio_stack());
+
+    bt_keys = bt_keys_storage_alloc(BT_KEYS_STORAGE_PATH);
+    furi_check(bt_keys);
+
+    FuriHalBleProfileBase* bt_profile = furi_hal_bt_start_app(
+        ble_profile_serial,
+        NULL,
+        bt_keys_storage_get_root_keys(bt_keys),
+        bt_test_gap_event_callback,
+        NULL);
+    furi_check(bt_profile);
+
+    furi_hal_bt_start_advertising();
+    FURI_LOG_I(TAG, "BLE profile started");
+#endif
 
 #if ENABLE_KEY_TEST
     FuriPubSub* input_events = NULL;
@@ -251,7 +310,6 @@ static int32_t lcd_test_thread(void* context) {
     uint32_t baseline_count = 0;
 
     while(true) {
-        
 #if ENABLE_KEY_TEST
         if(state.exit_requested) {
             break;
@@ -269,7 +327,9 @@ static int32_t lcd_test_thread(void* context) {
             }
         }
 
+#if ENABLE_RAW_GUI_TEST
         lcd_raw_add_rssi_sample(&state, state.rssi);
+#endif
 
         if(state.signal_active && state.edge_count != last_edges) {
             FURI_LOG_I(
@@ -293,12 +353,18 @@ static int32_t lcd_test_thread(void* context) {
     furi_hal_subghz_sleep();
 #endif
 
+#if ENABLE_BT_TEST
+    furi_hal_bt_stop_advertising();
+    bt_keys_storage_free(bt_keys);
+#endif
+
     gui_remove_view_port(gui, view_port);
     furi_record_close(RECORD_GUI);
     view_port_free(view_port);
 #if ENABLE_KEY_TEST
     furi_pubsub_unsubscribe(input_events, input_subscription);
     furi_record_close(RECORD_INPUT_EVENTS);
+#endif
 #endif
     return 0;
 }

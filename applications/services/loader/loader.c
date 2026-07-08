@@ -373,6 +373,7 @@ static const FlipperInternalApplication* loader_find_application_by_name(const c
         const FlipperInternalApplication* list;
         const uint32_t count;
     } lists[] = {
+        {FLIPPER_APPS, FLIPPER_APPS_COUNT},
         {FLIPPER_SETTINGS_APPS, FLIPPER_SETTINGS_APPS_COUNT},
         {FLIPPER_SYSTEM_APPS, FLIPPER_SYSTEM_APPS_COUNT},
         {FLIPPER_DEBUG_APPS, FLIPPER_DEBUG_APPS_COUNT},
@@ -825,7 +826,7 @@ int32_t loader_srv(void* p) {
     for(size_t i = 0; i < FLIPPER_ON_SYSTEM_START_COUNT; i++) {
         FLIPPER_ON_SYSTEM_START[i]();
     }
-
+    FURI_LOG_I(TAG, "Executing system end hooks");
     if((furi_hal_rtc_get_boot_mode() == FuriHalRtcBootModeNormal) && FLIPPER_AUTORUN_APP_NAME &&
        strlen(FLIPPER_AUTORUN_APP_NAME)) {
         FURI_LOG_I(TAG, "Starting autorun app: %s", FLIPPER_AUTORUN_APP_NAME);

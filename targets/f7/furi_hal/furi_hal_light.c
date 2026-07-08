@@ -1,94 +1,67 @@
 #include <core/common_defines.h>
-#include <furi_hal_resources.h>
+#include <furi.h>
 #include <furi_hal_light.h>
-#include <lp5562.h>
 #include <stdint.h>
 
-#define LED_CURRENT_RED   (50u)
-#define LED_CURRENT_GREEN (50u)
-#define LED_CURRENT_BLUE  (50u)
-#define LED_CURRENT_WHITE (150u)
+#define TAG "FuriHalLight"
+
+typedef struct {
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+    uint8_t backlight;
+} FuriHalLightState;
+
+static FuriHalLightState light_state;
 
 void furi_hal_light_init(void) {
-    furi_hal_i2c_acquire(&furi_hal_i2c_handle_power);
-
-    lp5562_reset(&furi_hal_i2c_handle_power);
-
-    lp5562_set_channel_current(&furi_hal_i2c_handle_power, LP5562ChannelRed, LED_CURRENT_RED);
-    lp5562_set_channel_current(&furi_hal_i2c_handle_power, LP5562ChannelGreen, LED_CURRENT_GREEN);
-    lp5562_set_channel_current(&furi_hal_i2c_handle_power, LP5562ChannelBlue, LED_CURRENT_BLUE);
-    lp5562_set_channel_current(&furi_hal_i2c_handle_power, LP5562ChannelWhite, LED_CURRENT_WHITE);
-
-    lp5562_set_channel_value(&furi_hal_i2c_handle_power, LP5562ChannelRed, 0x00);
-    lp5562_set_channel_value(&furi_hal_i2c_handle_power, LP5562ChannelGreen, 0x00);
-    lp5562_set_channel_value(&furi_hal_i2c_handle_power, LP5562ChannelBlue, 0x00);
-    lp5562_set_channel_value(&furi_hal_i2c_handle_power, LP5562ChannelWhite, 0x00);
-
-    lp5562_enable(&furi_hal_i2c_handle_power);
-    lp5562_configure(&furi_hal_i2c_handle_power);
-
-    furi_hal_i2c_release(&furi_hal_i2c_handle_power);
+    light_state.red = 0;
+    light_state.green = 0;
+    light_state.blue = 0;
+    light_state.backlight = 0;
+    FURI_LOG_I(TAG, "Init OK (simulated backend)");
 }
 
 void furi_hal_light_set(Light light, uint8_t value) {
-    furi_hal_i2c_acquire(&furi_hal_i2c_handle_power);
     if(light & LightRed) {
-        lp5562_set_channel_value(&furi_hal_i2c_handle_power, LP5562ChannelRed, value);
+        light_state.red = value;
+    }
+    if(light & LightRed) {
+        FURI_LOG_T(TAG, "Red=%u", value);
     }
     if(light & LightGreen) {
-        lp5562_set_channel_value(&furi_hal_i2c_handle_power, LP5562ChannelGreen, value);
+        light_state.green = value;
+        FURI_LOG_T(TAG, "Green=%u", value);
     }
     if(light & LightBlue) {
-        lp5562_set_channel_value(&furi_hal_i2c_handle_power, LP5562ChannelBlue, value);
+        light_state.blue = value;
+        FURI_LOG_T(TAG, "Blue=%u", value);
     }
     if(light & LightBacklight) {
-        uint8_t prev = lp5562_get_channel_value(&furi_hal_i2c_handle_power, LP5562ChannelWhite);
-        lp5562_execute_ramp(
-            &furi_hal_i2c_handle_power, LP5562Engine1, LP5562ChannelWhite, prev, value, 100);
+        light_state.backlight = value;
+        FURI_LOG_T(TAG, "Backlight=%u", value);
     }
-    furi_hal_i2c_release(&furi_hal_i2c_handle_power);
 }
 
 void furi_hal_light_blink_start(Light light, uint8_t brightness, uint16_t on_time, uint16_t period) {
-    furi_hal_i2c_acquire(&furi_hal_i2c_handle_power);
-    lp5562_set_channel_src(
-        &furi_hal_i2c_handle_power,
-        LP5562ChannelRed | LP5562ChannelGreen | LP5562ChannelBlue,
-        LP5562Direct);
-    LP5562Channel led_ch = 0;
-    if(light & LightRed) led_ch |= LP5562ChannelRed;
-    if(light & LightGreen) led_ch |= LP5562ChannelGreen;
-    if(light & LightBlue) led_ch |= LP5562ChannelBlue;
-    lp5562_execute_blink(
-        &furi_hal_i2c_handle_power, LP5562Engine2, led_ch, on_time, period, brightness);
-    furi_hal_i2c_release(&furi_hal_i2c_handle_power);
+    UNUSED(light);
+    UNUSED(brightness);
+    UNUSED(on_time);
+    UNUSED(period);
+    FURI_LOG_T(TAG, "Blink start ignored (simulated backend)");
 }
 
 void furi_hal_light_blink_stop(void) {
-    furi_hal_i2c_acquire(&furi_hal_i2c_handle_power);
-    lp5562_set_channel_src(
-        &furi_hal_i2c_handle_power,
-        LP5562ChannelRed | LP5562ChannelGreen | LP5562ChannelBlue,
-        LP5562Direct);
-    lp5562_stop_program(&furi_hal_i2c_handle_power, LP5562Engine2);
-    furi_hal_i2c_release(&furi_hal_i2c_handle_power);
+    FURI_LOG_T(TAG, "Blink stop ignored (simulated backend)");
 }
 
 void furi_hal_light_blink_set_color(Light light) {
-    furi_hal_i2c_acquire(&furi_hal_i2c_handle_power);
-    LP5562Channel led_ch = 0;
-    lp5562_set_channel_src(
-        &furi_hal_i2c_handle_power,
-        LP5562ChannelRed | LP5562ChannelGreen | LP5562ChannelBlue,
-        LP5562Direct);
-    if(light & LightRed) led_ch |= LP5562ChannelRed;
-    if(light & LightGreen) led_ch |= LP5562ChannelGreen;
-    if(light & LightBlue) led_ch |= LP5562ChannelBlue;
-    lp5562_set_channel_src(&furi_hal_i2c_handle_power, led_ch, LP5562Engine2);
-    furi_hal_i2c_release(&furi_hal_i2c_handle_power);
+    UNUSED(light);
+    FURI_LOG_T(TAG, "Blink color ignored (simulated backend)");
 }
 
 void furi_hal_light_sequence(const char* sequence) {
+    furi_check(sequence);
     do {
         if(*sequence == 'R') {
             furi_hal_light_set(LightRed, 0xFF);

@@ -58,7 +58,7 @@ SVD_FILE = "${FBT_DEBUG_DIR}/STM32WB55_CM4.svd"
 BLACKMAGIC = "auto"
 
 # Application to start on boot
-LOADER_AUTOSTART = ""
+LOADER_AUTOSTART = "Sub-GHz"
 
 FIRMWARE_APPS = {
     "default": [

@@ -18,6 +18,14 @@ from SCons.Warnings import WarningOnByDefault, warn
 
 
 class ApplicationsCGenerator:
+    STARTUP_HOOK_WHITELIST = {
+        "cli_on_system_start",
+        "storage_on_system_start",
+        "locale_on_system_start",
+        "loader_on_system_start",
+        "crypto_on_system_start",
+    }
+
     APP_TYPE_MAP = {
         FlipperAppType.SERVICE: ("FlipperInternalApplication", "FLIPPER_SERVICES"),
         FlipperAppType.SYSTEM: ("FlipperInternalApplication", "FLIPPER_SYSTEM_APPS"),
@@ -46,6 +54,12 @@ class ApplicationsCGenerator:
         if app.apptype == FlipperAppType.STARTUP:
             return f"extern void {app.entry_point}(void);"
         return f"extern int32_t {app.entry_point}(void* p);"
+
+    def get_apps_of_type(self, apptype: FlipperAppType):
+        apps = self.buildset.get_apps_of_type(apptype)
+        if apptype == FlipperAppType.STARTUP:
+            return [app for app in apps if app.entry_point in self.STARTUP_HOOK_WHITELIST]
+        return apps
 
     def get_app_descr(self, app: FlipperApplication):
         if app.apptype == FlipperAppType.STARTUP:
@@ -76,16 +90,11 @@ class ApplicationsCGenerator:
             f'const char* FLIPPER_AUTORUN_APP_NAME = "{self.autorun}";',
         ]
         for apptype in self.APP_TYPE_MAP:
-            contents.extend(
-                map(self.get_app_ep_forward, self.buildset.get_apps_of_type(apptype))
-            )
+            apps = self.get_apps_of_type(apptype)
+            contents.extend(map(self.get_app_ep_forward, apps))
             entry_type, entry_block = self.APP_TYPE_MAP[apptype]
             contents.append(f"const {entry_type} {entry_block}[] = {{")
-            contents.append(
-                ",\n".join(
-                    map(self.get_app_descr, self.buildset.get_apps_of_type(apptype))
-                )
-            )
+            contents.append(",\n".join(map(self.get_app_descr, apps)))
             contents.append("};")
             contents.append(
                 f"const size_t {entry_block}_COUNT = COUNT_OF({entry_block});"

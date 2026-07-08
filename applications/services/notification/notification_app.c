@@ -49,11 +49,6 @@ static void
 
     // set value
     layer->value[LayerInternal] = layer_value;
-
-    // apply if current layer is internal
-    if(layer->index == LayerInternal) {
-        furi_hal_light_set(layer->light, layer->value[LayerInternal]);
-    }
 }
 
 static void notification_apply_lcd_contrast(NotificationApp* app) {
@@ -87,8 +82,6 @@ static void notification_apply_notification_led_layer(
     layer->index = LayerNotification;
     // set layer
     layer->value[LayerNotification] = layer_value;
-    // apply
-    furi_hal_light_set(layer->light, layer->value[LayerNotification]);
 }
 
 static void notification_reset_notification_led_layer(NotificationLedLayer* layer) {
@@ -99,18 +92,12 @@ static void notification_reset_notification_led_layer(NotificationLedLayer* laye
     layer->value[LayerNotification] = 0;
     // set layer
     layer->index = LayerInternal;
-
-    // apply
-    furi_hal_light_set(layer->light, layer->value[LayerInternal]);
 }
 
 static void notification_reset_notification_layer(
     NotificationApp* app,
     uint8_t reset_mask,
     float display_brightness_set) {
-    if(reset_mask & reset_blink_mask) {
-        furi_hal_light_blink_stop();
-    }
     if(reset_mask & reset_red_mask) {
         notification_reset_notification_led_layer(&app->led[0]);
     }
@@ -126,15 +113,14 @@ static void notification_reset_notification_layer(
     if(reset_mask & reset_sound_mask) {
         notification_sound_off();
     }
+    UNUSED(display_brightness_set);
     if(reset_mask & reset_display_mask) {
-        if(!float_is_equal(display_brightness_set, app->settings.display_brightness)) {
-            furi_hal_light_set(LightBacklight, app->settings.display_brightness * 0xFF);
-        }
         furi_timer_start(app->display_timer, notification_settings_display_off_delay_ticks(app));
     }
 }
 
 static void notification_apply_notification_leds(NotificationApp* app, const uint8_t* values) {
+    UNUSED(app);
     for(uint8_t i = 0; i < NOTIFICATION_LED_COUNT; i++) {
         notification_apply_notification_led_layer(
             &app->led[i], notification_settings_get_rgb_led_brightness(app, values[i]));
@@ -507,15 +493,23 @@ static bool notification_save_settings(NotificationApp* app) {
 static void input_event_callback(const void* value, void* context) {
     furi_assert(value);
     furi_assert(context);
-    NotificationApp* app = context;
-    notification_message(app, &sequence_display_backlight_on);
+    UNUSED(value);
+    UNUSED(context);
 }
 
 // App alloc
 static NotificationApp* notification_app_alloc(void) {
     NotificationApp* app = malloc(sizeof(NotificationApp));
+    furi_check(app);
+    FURI_LOG_I(TAG, "notification_app_alloc: app=%p", app);
+
     app->queue = furi_message_queue_alloc(8, sizeof(NotificationAppMessage));
+    furi_check(app->queue);
+    FURI_LOG_I(TAG, "notification_app_alloc: queue=%p", app->queue);
+
     app->display_timer = furi_timer_alloc(notification_display_timer, FuriTimerTypeOnce, app);
+    furi_check(app->display_timer);
+    FURI_LOG_I(TAG, "notification_app_alloc: display_timer=%p", app->display_timer);
 
     app->settings.speaker_volume = 1.0f;
     app->settings.display_brightness = 1.0f;
@@ -545,10 +539,13 @@ static NotificationApp* notification_app_alloc(void) {
 
     app->settings.version = NOTIFICATION_SETTINGS_VERSION;
 
-    // display backlight control
+    FURI_LOG_I(TAG, "notification_app_alloc: waiting for input record");
     app->event_record = furi_record_open(RECORD_INPUT_EVENTS);
+    furi_check(app->event_record);
+    FURI_LOG_I(TAG, "notification_app_alloc: input record=%p", app->event_record);
+
     furi_pubsub_subscribe(app->event_record, input_event_callback, app);
-    notification_message(app, &sequence_display_backlight_on);
+    FURI_LOG_I(TAG, "notification_app_alloc: input subscribed");
 
     return app;
 }
@@ -557,7 +554,8 @@ static void notification_storage_callback(const void* message, void* context) {
     furi_assert(context);
     NotificationApp* app = context;
     const StorageEvent* event = message;
-
+    FURI_LOG_I(TAG, "Queue created: %p", app->queue);
+    furi_check(app->queue != NULL);
     if(event->type == StorageEventTypeCardMount) {
         NotificationAppMessage m = {
             .type = LoadSettingsMessage,
@@ -573,35 +571,61 @@ static void notification_apply_settings(NotificationApp* app) {
     }
 
     notification_apply_lcd_contrast(app);
+    FURI_LOG_I(TAG, "notification_apply_settings");
 }
 
 static void notification_init_settings(NotificationApp* app) {
-    Storage* storage = furi_record_open(RECORD_STORAGE);
-    furi_pubsub_subscribe(storage_get_pubsub(storage), notification_storage_callback, app);
+    if(!furi_record_exists(RECORD_STORAGE)) {
+        FURI_LOG_D(TAG, "Storage record not ready, skip settings init");
+        return;
+    }
 
+    FURI_LOG_I(TAG, "opening storage record");
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    FURI_LOG_I(TAG, "storage record opened");
+
+    furi_pubsub_subscribe(storage_get_pubsub(storage), notification_storage_callback, app);
+    FURI_LOG_I(TAG, "storage pubsub subscribed");
+
+    FURI_LOG_I(TAG, "checking storage sd status");
     if(storage_sd_status(storage) != FSE_OK) {
         FURI_LOG_D(TAG, "SD Card not ready, skipping settings");
         return;
     }
 
+    FURI_LOG_I(TAG, "applying notification settings");
     notification_apply_settings(app);
+    FURI_LOG_I(TAG, "notification settings applied");
 }
 
 // App
 int32_t notification_srv(void* p) {
     UNUSED(p);
     NotificationApp* app = notification_app_alloc();
+    FURI_LOG_I(TAG, "notification_app_alloc");
 
+    FURI_LOG_I(TAG, "notification_init_settings begin");
     notification_init_settings(app);
+    FURI_LOG_I(TAG, "notification_init_settings end");
 
+    FURI_LOG_I(TAG, "notification_vibro_off begin");
     notification_vibro_off();
+    FURI_LOG_I(TAG, "notification_vibro_off end");
+
+    FURI_LOG_I(TAG, "notification_sound_off begin");
     notification_sound_off();
+    FURI_LOG_I(TAG, "notification_sound_off end");
+
+    FURI_LOG_I(TAG, "reset internal layers begin");
     notification_apply_internal_led_layer(&app->display, 0x00);
     notification_apply_internal_led_layer(&app->led[0], 0x00);
     notification_apply_internal_led_layer(&app->led[1], 0x00);
     notification_apply_internal_led_layer(&app->led[2], 0x00);
+    FURI_LOG_I(TAG, "reset internal layers end");
 
+    FURI_LOG_I(TAG, "creating notification record");
     furi_record_create(RECORD_NOTIFICATION, app);
+    FURI_LOG_I(TAG, "notification record created");
 
     NotificationAppMessage message;
     while(1) {

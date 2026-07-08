@@ -7,7 +7,7 @@
 #define TAG "FuriHal"
 
 #ifndef ENABLE_FURI_HAL_SUBGHZ_INIT
-#define ENABLE_FURI_HAL_SUBGHZ_INIT 0
+#define ENABLE_FURI_HAL_SUBGHZ_INIT 1
 #endif
 
 void furi_hal_init_early(void) {
@@ -51,7 +51,7 @@ void furi_hal_init(void) {
     furi_hal_speaker_init();
     furi_hal_crypto_init();
     // furi_hal_i2c_init();
-    // furi_hal_power_init();
+    furi_hal_power_init();
     // furi_hal_light_init();
     furi_hal_bt_init();
     furi_hal_memory_init();

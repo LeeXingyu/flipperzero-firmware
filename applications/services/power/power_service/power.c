@@ -286,6 +286,9 @@ static Power* power_alloc(void) {
     // Pubsub
     power->event_pubsub = furi_pubsub_alloc();
     // State initialization
+    power->state = PowerStateNotCharging;
+    power->battery_level = 100;
+    power->is_otg_requested = false;
     power->power_off_timeout = POWER_OFF_TIMEOUT_S;
     power->show_battery_low_warning = true;
     // Gui
