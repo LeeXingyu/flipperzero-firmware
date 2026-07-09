@@ -19,12 +19,11 @@ from SCons.Warnings import WarningOnByDefault, warn
 
 class ApplicationsCGenerator:
     # STARTUP_HOOK_WHITELIST = {
-        # Temporarily disabled for startup-path validation.
-        # "cli_on_system_start",
-        # "storage_on_system_start",
-        # "locale_on_system_start",
-        # "loader_on_system_start",
-        # "crypto_on_system_start",
+    #     "cli_on_system_start",
+    #     "storage_on_system_start",
+    #     "locale_on_system_start",
+    #     "loader_on_system_start",
+    #     "crypto_on_system_start",
     # }
 
     APP_TYPE_MAP = {
