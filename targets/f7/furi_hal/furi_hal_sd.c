@@ -911,6 +911,39 @@ uint8_t furi_hal_sd_max_mount_retry_count(void) {
     return 10;
 }
 
+bool furi_hal_sd_probe(bool power_reset) {
+    furi_hal_spi_acquire(&furi_hal_spi_bus_handle_sd_slow);
+    furi_hal_sd_spi_handle = &furi_hal_spi_bus_handle_sd_slow;
+
+    if(power_reset) {
+        sd_spi_debug("Probe power reset");
+
+        furi_hal_power_disable_external_3_3v();
+        sd_spi_bus_to_ground();
+        furi_hal_sd_present_pin_set_low();
+        furi_delay_ms(250);
+
+        sd_spi_bus_rise_up();
+        furi_hal_sd_presence_init();
+        furi_hal_power_enable_external_3_3v();
+        furi_delay_ms(100);
+    }
+
+    sd_spi_deselect_card();
+    for(uint8_t i = 0; i < 80; i++) {
+        sd_spi_write_byte(SD_DUMMY_BYTE);
+    }
+
+    SdSpiCmdAnswer response =
+        sd_spi_send_cmd(SD_CMD0_GO_IDLE_STATE, 0, 0x95, SdSpiCmdAnswerTypeR1);
+    sd_spi_deselect_card_and_purge();
+
+    furi_hal_sd_spi_handle = NULL;
+    furi_hal_spi_release(&furi_hal_spi_bus_handle_sd_slow);
+
+    return response.r1 == SdSpi_R1_IN_IDLE_STATE;
+}
+
 FuriStatus furi_hal_sd_init(bool power_reset) {
     // Slow speed init
     furi_hal_spi_acquire(&furi_hal_spi_bus_handle_sd_slow);

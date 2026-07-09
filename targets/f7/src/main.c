@@ -10,16 +10,18 @@
 #include <gui/gui.h>
 #include <input/input.h>
 #include <storage/storage.h>
+#include <storage/storage_sd_api.h>
 #include <lib/subghz/devices/cc1101_configs.h>
 
 #define TAG "LcdTest"
 
+#define SD_TEST             1
 #define ENABLE_GUI_TEST     0
 #define ENABLE_BT_TEST      0
 #define ENABLE_CC1101_TEST  0
 #define ENABLE_RAW_GUI_TEST 0
 #define ENABLE_KEY_TEST     0
-#define ENABLE_FLIPPER_TEST 1
+#define ENABLE_FLIPPER_TEST 0
 
 #define CC1101_FREQ_HZ              433920000UL
 #define CC1101_SIGNAL_THRESHOLD_DBM (-50.0f)
@@ -35,7 +37,105 @@
 #define BT_KEYS_STORAGE_PATH INT_PATH(BT_KEYS_STORAGE_FILE_NAME)
 #endif
 #endif
+#if SD_TEST
+static int32_t sd_test_thread(void) {
+    FURI_LOG_I(TAG, "SD test begin");
+    FURI_LOG_I(TAG, "Hardware note: no CD pin, presence check is skipped");
+    FURI_LOG_I(TAG, "Polling until CMD0 probe succeeds");
 
+    uint32_t probe_attempt = 0;
+    while(true) {
+        probe_attempt++;
+        bool power_reset = (probe_attempt == 1U) || ((probe_attempt % 2U) == 1U);
+        FURI_LOG_I(
+            TAG,
+            "Probe poll %lu: furi_hal_sd_probe(power_reset=%s) begin",
+            (unsigned long)probe_attempt,
+            power_reset ? "true" : "false");
+
+        bool card_present = furi_hal_sd_probe(power_reset);
+        FURI_LOG_I(
+            TAG,
+            "Probe poll %lu: furi_hal_sd_probe(power_reset=%s) result=%s",
+            (unsigned long)probe_attempt,
+            power_reset ? "true" : "false",
+            card_present ? "true" : "false");
+
+        if(card_present) {
+            FURI_LOG_I(TAG, "CMD0 responded, card likely present");
+            break;
+        }
+
+        FURI_LOG_W(TAG, "CMD0 no response, waiting 1s before retry");
+        furi_delay_ms(1000);
+    }
+
+    FURI_LOG_I(TAG, "Polling until SD init succeeds");
+
+    uint32_t init_attempt = 0;
+    while(true) {
+        init_attempt++;
+        FURI_LOG_I(
+            TAG,
+            "Init poll %lu: furi_hal_sd_init(power_reset=false) begin",
+            (unsigned long)init_attempt);
+
+        FuriStatus status = furi_hal_sd_init(false);
+        FURI_LOG_I(
+            TAG,
+            "Init poll %lu: furi_hal_sd_init(power_reset=false) result=%ld",
+            (unsigned long)init_attempt,
+            (long)status);
+
+        if(status == FuriStatusOk) {
+            FURI_LOG_I(TAG, "SD HAL init ok on poll %lu", (unsigned long)init_attempt);
+            break;
+        }
+
+        FURI_LOG_W(TAG, "SD init failed, waiting 1s before retry");
+        furi_delay_ms(1000);
+    }
+
+    FURI_LOG_I(TAG, "Polling until SD info succeeds");
+
+    uint32_t info_attempt = 0;
+    while(true) {
+        info_attempt++;
+        FURI_LOG_I(TAG, "Info poll %lu: furi_hal_sd_info begin", (unsigned long)info_attempt);
+
+        FuriHalSdInfo sd_info = {0};
+        FuriStatus status = furi_hal_sd_info(&sd_info);
+        FURI_LOG_I(
+            TAG,
+            "Info poll %lu: furi_hal_sd_info result=%ld",
+            (unsigned long)info_attempt,
+            (long)status);
+
+        if(status == FuriStatusOk) {
+            FURI_LOG_I(
+                TAG,
+                "SD card ready: manuf=%02x oem=%s name=%s rev=%u.%u sn=%08lx total=%lu KiB block=%lu logical=%lu",
+                sd_info.manufacturer_id,
+                sd_info.oem_id,
+                sd_info.product_name,
+                sd_info.product_revision_major,
+                sd_info.product_revision_minor,
+                (unsigned long)sd_info.product_serial_number,
+                (unsigned long)(sd_info.capacity / 1024UL),
+                (unsigned long)sd_info.block_size,
+                (unsigned long)sd_info.logical_block_count);
+
+            FURI_LOG_I(TAG, "SD test success");
+            break;
+        }
+
+        FURI_LOG_W(TAG, "SD info failed, waiting 1s before retry");
+        furi_delay_ms(1000);
+    }
+
+    return 0;
+}
+#endif
 typedef struct {
     volatile bool signal_active;
     volatile float rssi;
@@ -200,9 +300,11 @@ static void lcd_input_events_callback(const void* message, void* context) {
 static int32_t lcd_test_thread(void* context) {
     UNUSED(context);
     furi_hal_init();
-    flipper_init();
+    // flipper_init();
     FURI_LOG_I(TAG, "Main started");
-#if ENABLE_FLIPPER_TEST
+#if SD_TEST
+    return sd_test_thread();
+#elif ENABLE_FLIPPER_TEST
     furi_background();
 #else
 #if ENABLE_BT_TEST

@@ -7,7 +7,7 @@
 #define TAG "FuriHal"
 
 #ifndef ENABLE_FURI_HAL_SUBGHZ_INIT
-#define ENABLE_FURI_HAL_SUBGHZ_INIT 1
+#define ENABLE_FURI_HAL_SUBGHZ_INIT 0
 #endif
 
 void furi_hal_init_early(void) {

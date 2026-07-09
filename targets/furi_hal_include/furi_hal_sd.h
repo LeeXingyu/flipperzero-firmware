@@ -44,6 +44,13 @@ bool furi_hal_sd_is_present(void);
 uint8_t furi_hal_sd_max_mount_retry_count(void);
 
 /**
+ * @brief Probe SD card by issuing CMD0 and checking for a valid response
+ * @param power_reset reset card power before probing
+ * @return true if CMD0 got a valid card response
+ */
+bool furi_hal_sd_probe(bool power_reset);
+
+/**
  * @brief Init SD card
  * @param power_reset reset card power
  * @return FuriStatus 
