@@ -268,15 +268,19 @@ bool furi_hal_crypto_enclave_load_key(uint8_t slot, const uint8_t* iv) {
 
     do {
         if(!furi_hal_bt_is_alive()) {
+            FURI_LOG_E(TAG, "enclave_load_key slot %u failed: BT core2 not alive", slot);
             break;
         }
 
         furi_hal_crypto_mode_init_done = false;
         crypto_key_init(NULL, (uint32_t*)iv);
 
-        if(SHCI_C2_FUS_LoadUsrKey(slot) == SHCI_Success) {
+        SHCI_CmdStatus_t status = SHCI_C2_FUS_LoadUsrKey(slot);
+        if(status == SHCI_Success) {
             success = true;
+            FURI_LOG_I(TAG, "enclave_load_key slot %u ok", slot);
         } else {
+            FURI_LOG_E(TAG, "enclave_load_key slot %u failed, SHCI status=%d", slot, status);
             CLEAR_BIT(AES1->CR, AES_CR_EN);
             furi_check(furi_mutex_release(furi_hal_crypto_mutex) == FuriStatusOk);
         }

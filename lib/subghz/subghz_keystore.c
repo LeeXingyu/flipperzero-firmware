@@ -2,6 +2,7 @@
 
 #include <furi.h>
 #include <furi_hal.h>
+#include <furi_hal_bt.h>
 
 #include <storage/storage.h>
 #include <toolbox/hex.h>
@@ -116,10 +117,16 @@ static bool subghz_keystore_read_file(SubGhzKeystore* instance, Stream* stream, 
 
     do {
         if(iv) {
+            FURI_LOG_I(TAG, "Encrypted keystore detected, loading decrypt key slot %u", SUBGHZ_KEYSTORE_FILE_ENCRYPTION_KEY_SLOT);
             if(!furi_hal_crypto_enclave_load_key(SUBGHZ_KEYSTORE_FILE_ENCRYPTION_KEY_SLOT, iv)) {
-                FURI_LOG_E(TAG, "Unable to load decryption key");
+                FURI_LOG_E(
+                    TAG,
+                    "Unable to load decryption key, slot=%u, bt_alive=%s",
+                    SUBGHZ_KEYSTORE_FILE_ENCRYPTION_KEY_SLOT,
+                    furi_hal_bt_is_alive() ? "true" : "false");
                 break;
             }
+            FURI_LOG_I(TAG, "Decrypt key loaded, start parsing encrypted stream");
         }
 
         size_t ret = 0;
@@ -213,6 +220,13 @@ bool subghz_keystore_load(SubGhzKeystore* instance, const char* file_name) {
             break;
         }
 
+        FURI_LOG_I(
+            TAG,
+            "Keystore header: type=%s version=%lu encryption=%lu",
+            furi_string_get_cstr(filetype),
+            (unsigned long)version,
+            (unsigned long)encryption);
+
         if(strcmp(furi_string_get_cstr(filetype), SUBGHZ_KEYSTORE_FILE_TYPE) != 0 ||
            version != SUBGHZ_KEYSTORE_FILE_VERSION) {
             FURI_LOG_E(TAG, "Type or version mismatch");
@@ -221,12 +235,21 @@ bool subghz_keystore_load(SubGhzKeystore* instance, const char* file_name) {
 
         Stream* stream = flipper_format_get_raw_stream(flipper_format);
         if(encryption == SubGhzKeystoreEncryptionNone) {
+            FURI_LOG_I(TAG, "Loading plain keystore stream");
             result = subghz_keystore_read_file(instance, stream, NULL);
         } else if(encryption == SubGhzKeystoreEncryptionAES256) {
+            FURI_LOG_I(TAG, "Loading AES256 encrypted keystore");
             if(!flipper_format_read_hex(flipper_format, "IV", iv, 16)) {
                 FURI_LOG_E(TAG, "Missing IV");
                 break;
             }
+            FURI_LOG_I(
+                TAG,
+                "IV read ok, first bytes=%02X %02X %02X %02X",
+                iv[0],
+                iv[1],
+                iv[2],
+                iv[3]);
             subghz_keystore_mess_with_iv(iv);
             result = subghz_keystore_read_file(instance, stream, iv);
         } else {

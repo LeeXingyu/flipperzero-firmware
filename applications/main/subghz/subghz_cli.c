@@ -45,14 +45,9 @@ static void subghz_cli_radio_device_power_off(void) {
 static SubGhzEnvironment* subghz_cli_environment_init(void) {
     SubGhzEnvironment* environment = subghz_environment_alloc();
     if(subghz_environment_load_keystore(environment, SUBGHZ_KEYSTORE_DIR_NAME)) {
-        printf("Load_keystore keeloq_mfcodes \033[0;32mOK\033[0m\r\n");
-    } else {
-        printf("Load_keystore keeloq_mfcodes \033[0;31mERROR\033[0m\r\n");
-    }
-    if(subghz_environment_load_keystore(environment, SUBGHZ_KEYSTORE_DIR_USER_NAME)) {
         printf("Load_keystore keeloq_mfcodes_user \033[0;32mOK\033[0m\r\n");
     } else {
-        printf("Load_keystore keeloq_mfcodes_user \033[0;33mAbsent\033[0m\r\n");
+        printf("Load_keystore keeloq_mfcodes_user \033[0;31mERROR\033[0m\r\n");
     }
     subghz_environment_set_came_atomo_rainbow_table_file_name(
         environment, SUBGHZ_CAME_ATOMO_DIR_NAME);

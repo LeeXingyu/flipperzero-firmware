@@ -16,7 +16,7 @@ extern const LL_SPI_InitTypeDef furi_hal_spi_preset_1edge_low_8m;
 extern const LL_SPI_InitTypeDef furi_hal_spi_preset_1edge_low_4m;
 
 /** Preset for SdCard in fast mode */
-extern const LL_SPI_InitTypeDef furi_hal_spi_preset_sd_fast_8m;
+extern const LL_SPI_InitTypeDef furi_hal_spi_preset_sd_fast_4m;
 
 /** Preset for SdCard in slow mode */
 extern const LL_SPI_InitTypeDef furi_hal_spi_preset_sd_slow_500k;
@@ -34,7 +34,7 @@ extern const FuriHalSpiBusHandle furi_hal_spi_bus_handle_subghz;
 extern const FuriHalSpiBusHandle furi_hal_spi_bus_handle_nfc;
 
 /** External on `furi_hal_spi_bus_r`
- * Preset: `furi_hal_spi_preset_sd_slow_500k`
+ * Preset: internal 500k preset
  * 
  * miso: pa6
  * mosi: pa7

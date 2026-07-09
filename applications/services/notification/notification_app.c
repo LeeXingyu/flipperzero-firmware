@@ -501,15 +501,15 @@ static void input_event_callback(const void* value, void* context) {
 static NotificationApp* notification_app_alloc(void) {
     NotificationApp* app = malloc(sizeof(NotificationApp));
     furi_check(app);
-    FURI_LOG_I(TAG, "notification_app_alloc: app=%p", app);
+    //FURI_LOG_I(TAG, "notification_app_alloc: app=%p", app);
 
     app->queue = furi_message_queue_alloc(8, sizeof(NotificationAppMessage));
     furi_check(app->queue);
-    FURI_LOG_I(TAG, "notification_app_alloc: queue=%p", app->queue);
+    //FURI_LOG_I(TAG, "notification_app_alloc: queue=%p", app->queue);
 
     app->display_timer = furi_timer_alloc(notification_display_timer, FuriTimerTypeOnce, app);
     furi_check(app->display_timer);
-    FURI_LOG_I(TAG, "notification_app_alloc: display_timer=%p", app->display_timer);
+    // FURI_LOG_I(TAG, "notification_app_alloc: display_timer=%p", app->display_timer);
 
     app->settings.speaker_volume = 1.0f;
     app->settings.display_brightness = 1.0f;
@@ -539,13 +539,13 @@ static NotificationApp* notification_app_alloc(void) {
 
     app->settings.version = NOTIFICATION_SETTINGS_VERSION;
 
-    FURI_LOG_I(TAG, "notification_app_alloc: waiting for input record");
+    // FURI_LOG_I(TAG, "notification_app_alloc: waiting for input record");
     app->event_record = furi_record_open(RECORD_INPUT_EVENTS);
     furi_check(app->event_record);
-    FURI_LOG_I(TAG, "notification_app_alloc: input record=%p", app->event_record);
+    //FURI_LOG_I(TAG, "notification_app_alloc: input record=%p", app->event_record);
 
     furi_pubsub_subscribe(app->event_record, input_event_callback, app);
-    FURI_LOG_I(TAG, "notification_app_alloc: input subscribed");
+    // FURI_LOG_I(TAG, "notification_app_alloc: input subscribed");
 
     return app;
 }

@@ -3,10 +3,32 @@
 #include <lib/subghz/protocols/protocol_items.h>
 #include <applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h>
 #include <lib/subghz/devices/cc1101_int/cc1101_int_interconnect.h>
+#include <storage/storage.h>
 
 #include <power/power_service/power.h>
 
 #define TAG "SubGhz"
+
+static void subghz_txrx_log_resource_presence(Storage* storage, const char* path, bool is_dir) {
+    bool present = is_dir ? storage_dir_exists(storage, path) : storage_file_exists(storage, path);
+    FURI_LOG_I(TAG, "resource %s: %s", path, present ? "present" : "missing");
+}
+
+static void subghz_txrx_log_external_resources(void) {
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+
+    subghz_txrx_log_resource_presence(storage, SUBGHZ_APP_FOLDER, true);
+    subghz_txrx_log_resource_presence(storage, EXT_PATH("subghz/assets"), true);
+    subghz_txrx_log_resource_presence(storage, EXT_PATH("subghz/assets/setting_user"), false);
+    subghz_txrx_log_resource_presence(storage, SUBGHZ_KEYSTORE_DIR_NAME, false);
+    subghz_txrx_log_resource_presence(storage, SUBGHZ_KEYSTORE_DIR_USER_NAME, false);
+    subghz_txrx_log_resource_presence(storage, SUBGHZ_CAME_ATOMO_DIR_NAME, false);
+    subghz_txrx_log_resource_presence(storage, SUBGHZ_NICE_FLOR_S_DIR_NAME, false);
+    subghz_txrx_log_resource_presence(storage, SUBGHZ_ALUTECH_AT_4N_DIR_NAME, false);
+    subghz_txrx_log_resource_presence(storage, EXT_PATH("apps_data/subghz/plugins"), true);
+
+    furi_record_close(RECORD_STORAGE);
+}
 
 static void subghz_txrx_radio_device_power_on(SubGhzTxRx* instance) {
     UNUSED(instance);
@@ -25,6 +47,7 @@ static void subghz_txrx_radio_device_power_off(SubGhzTxRx* instance) {
 SubGhzTxRx* subghz_txrx_alloc(void) {
     SubGhzTxRx* instance = malloc(sizeof(SubGhzTxRx));
     instance->setting = subghz_setting_alloc();
+    subghz_txrx_log_external_resources();
     subghz_setting_load(instance->setting, EXT_PATH("subghz/assets/setting_user"));
 
     instance->preset = malloc(sizeof(SubGhzRadioPreset));
@@ -43,7 +66,6 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
     instance->environment = subghz_environment_alloc();
     instance->is_database_loaded =
         subghz_environment_load_keystore(instance->environment, SUBGHZ_KEYSTORE_DIR_NAME);
-    subghz_environment_load_keystore(instance->environment, SUBGHZ_KEYSTORE_DIR_USER_NAME);
     subghz_environment_set_came_atomo_rainbow_table_file_name(
         instance->environment, SUBGHZ_CAME_ATOMO_DIR_NAME);
     subghz_environment_set_alutech_at_4n_rainbow_table_file_name(

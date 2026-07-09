@@ -47,20 +47,33 @@ const LL_SPI_InitTypeDef furi_hal_spi_preset_1edge_low_4m = {
     .CRCPoly = 7,
 };
 
-const LL_SPI_InitTypeDef furi_hal_spi_preset_sd_fast_8m = {
+const LL_SPI_InitTypeDef furi_hal_spi_preset_sd_fast_4m = {
     .Mode = LL_SPI_MODE_MASTER,
     .TransferDirection = LL_SPI_FULL_DUPLEX,
     .DataWidth = LL_SPI_DATAWIDTH_8BIT,
     .ClockPolarity = LL_SPI_POLARITY_LOW,
     .ClockPhase = LL_SPI_PHASE_1EDGE,
     .NSS = LL_SPI_NSS_SOFT,
-    .BaudRate = LL_SPI_BAUDRATEPRESCALER_DIV8,
+    .BaudRate = LL_SPI_BAUDRATEPRESCALER_DIV32,
     .BitOrder = LL_SPI_MSB_FIRST,
     .CRCCalculation = LL_SPI_CRCCALCULATION_DISABLE,
     .CRCPoly = 7,
 };
 
 const LL_SPI_InitTypeDef furi_hal_spi_preset_sd_slow_500k = {
+    .Mode = LL_SPI_MODE_MASTER,
+    .TransferDirection = LL_SPI_FULL_DUPLEX,
+    .DataWidth = LL_SPI_DATAWIDTH_8BIT,
+    .ClockPolarity = LL_SPI_POLARITY_LOW,
+    .ClockPhase = LL_SPI_PHASE_1EDGE,
+    .NSS = LL_SPI_NSS_SOFT,
+    .BaudRate = LL_SPI_BAUDRATEPRESCALER_DIV128,
+    .BitOrder = LL_SPI_MSB_FIRST,
+    .CRCCalculation = LL_SPI_CRCCALCULATION_DISABLE,
+    .CRCPoly = 7,
+};
+
+static const LL_SPI_InitTypeDef furi_hal_spi_preset_external_500k = {
     .Mode = LL_SPI_MODE_MASTER,
     .TransferDirection = LL_SPI_FULL_DUPLEX,
     .DataWidth = LL_SPI_DATAWIDTH_8BIT,
@@ -338,7 +351,7 @@ static void furi_hal_spi_bus_handle_external_event_callback(
     const FuriHalSpiBusHandle* handle,
     FuriHalSpiBusHandleEvent event) {
     furi_hal_spi_bus_external_handle_event_callback(
-        handle, event, &furi_hal_spi_preset_sd_slow_500k);
+        handle, event, &furi_hal_spi_preset_external_500k);
 }
 
 const FuriHalSpiBusHandle furi_hal_spi_bus_handle_external = {
@@ -409,7 +422,7 @@ const FuriHalSpiBusHandle furi_hal_spi_bus_handle_display = {
 static void furi_hal_spi_bus_handle_sd_fast_event_callback(
     const FuriHalSpiBusHandle* handle,
     FuriHalSpiBusHandleEvent event) {
-    furi_hal_spi_bus_d_handle_event_callback(handle, event, &furi_hal_spi_preset_sd_fast_8m);
+    furi_hal_spi_bus_d_handle_event_callback(handle, event, &furi_hal_spi_preset_sd_fast_4m);
 }
 
 const FuriHalSpiBusHandle furi_hal_spi_bus_handle_sd_fast = {

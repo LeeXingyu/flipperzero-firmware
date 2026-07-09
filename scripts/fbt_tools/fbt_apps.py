@@ -18,13 +18,14 @@ from SCons.Warnings import WarningOnByDefault, warn
 
 
 class ApplicationsCGenerator:
-    STARTUP_HOOK_WHITELIST = {
-        "cli_on_system_start",
-        "storage_on_system_start",
-        "locale_on_system_start",
-        "loader_on_system_start",
-        "crypto_on_system_start",
-    }
+    # STARTUP_HOOK_WHITELIST = {
+        # Temporarily disabled for startup-path validation.
+        # "cli_on_system_start",
+        # "storage_on_system_start",
+        # "locale_on_system_start",
+        # "loader_on_system_start",
+        # "crypto_on_system_start",
+    # }
 
     APP_TYPE_MAP = {
         FlipperAppType.SERVICE: ("FlipperInternalApplication", "FLIPPER_SERVICES"),
@@ -57,8 +58,8 @@ class ApplicationsCGenerator:
 
     def get_apps_of_type(self, apptype: FlipperAppType):
         apps = self.buildset.get_apps_of_type(apptype)
-        if apptype == FlipperAppType.STARTUP:
-            return [app for app in apps if app.entry_point in self.STARTUP_HOOK_WHITELIST]
+        # if apptype == FlipperAppType.STARTUP:
+        #     return [app for app in apps if app.entry_point in self.STARTUP_HOOK_WHITELIST]
         return apps
 
     def get_app_descr(self, app: FlipperApplication):

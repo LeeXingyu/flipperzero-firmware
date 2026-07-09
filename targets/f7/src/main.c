@@ -15,13 +15,13 @@
 
 #define TAG "LcdTest"
 
-#define SD_TEST             1
+#define SD_TEST             0
 #define ENABLE_GUI_TEST     0
 #define ENABLE_BT_TEST      0
 #define ENABLE_CC1101_TEST  0
 #define ENABLE_RAW_GUI_TEST 0
 #define ENABLE_KEY_TEST     0
-#define ENABLE_FLIPPER_TEST 0
+#define ENABLE_FLIPPER_TEST 1
 
 #define CC1101_FREQ_HZ              433920000UL
 #define CC1101_SIGNAL_THRESHOLD_DBM (-50.0f)
@@ -300,7 +300,7 @@ static void lcd_input_events_callback(const void* message, void* context) {
 static int32_t lcd_test_thread(void* context) {
     UNUSED(context);
     furi_hal_init();
-    // flipper_init();
+    flipper_init();
     FURI_LOG_I(TAG, "Main started");
 #if SD_TEST
     return sd_test_thread();
