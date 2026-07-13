@@ -87,6 +87,13 @@ SubGhz* subghz_alloc(void) {
         SubGhzViewIdReceiver,
         subghz_view_receiver_get_view(subghz->subghz_receiver));
 
+    // POCSAG
+    subghz->subghz_pocsag = subghz_view_pocsag_alloc();
+    view_dispatcher_add_view(
+        subghz->view_dispatcher,
+        SubGhzViewIdPocsag,
+        subghz_view_pocsag_get_view(subghz->subghz_pocsag));
+
     // Popup
     subghz->popup = popup_alloc();
     view_dispatcher_add_view(
@@ -138,6 +145,7 @@ SubGhz* subghz_alloc(void) {
 
     subghz_unlock(subghz);
     subghz_rx_key_state_set(subghz, SubGhzRxKeyStateIDLE);
+    subghz->pocsag_rx_key_state = SubGhzRxKeyStateIDLE;
     subghz->history = subghz_history_alloc();
     subghz->filter = SubGhzProtocolFlag_Decodable;
 
@@ -169,6 +177,10 @@ void subghz_free(SubGhz* subghz) {
     // Receiver
     view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdReceiver);
     subghz_view_receiver_free(subghz->subghz_receiver);
+
+    // POCSAG
+    view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdPocsag);
+    subghz_view_pocsag_free(subghz->subghz_pocsag);
 
     // TextInput
     view_dispatcher_remove_view(subghz->view_dispatcher, SubGhzViewIdTextInput);

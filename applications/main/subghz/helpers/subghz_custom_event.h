@@ -8,6 +8,7 @@ typedef enum {
     //SubmenuIndex
     SubmenuIndexPricenton_433,
     SubmenuIndexPricenton_315,
+    SubmenuIndexPocsag,
     SubmenuIndexNiceFlo12bit,
     SubmenuIndexNiceFlo24bit,
     SubmenuIndexCAME12bit,

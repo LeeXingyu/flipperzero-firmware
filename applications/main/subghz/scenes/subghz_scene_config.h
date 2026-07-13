@@ -1,4 +1,7 @@
 ADD_SCENE(subghz, start, Start)
+ADD_SCENE(subghz, pocsag, Pocsag)
+ADD_SCENE(subghz, pocsag_config, PocsagConfig)
+ADD_SCENE(subghz, pocsag_info, PocsagInfo)
 ADD_SCENE(subghz, receiver, Receiver)
 ADD_SCENE(subghz, receiver_config, ReceiverConfig)
 ADD_SCENE(subghz, receiver_info, ReceiverInfo)

@@ -73,6 +73,7 @@ typedef enum {
 typedef enum {
     SubGhzViewIdMenu,
     SubGhzViewIdReceiver,
+    SubGhzViewIdPocsag,
     SubGhzViewIdPopup,
     SubGhzViewIdTextInput,
     SubGhzViewIdWidget,

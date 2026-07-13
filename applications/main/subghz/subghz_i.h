@@ -4,6 +4,7 @@
 #include <lib/subghz/types.h>
 #include "subghz.h"
 #include "views/receiver.h"
+#include "views/subghz_view_pocsag.h"
 #include "views/transmitter.h"
 #include "views/subghz_frequency_analyzer.h"
 #include "views/subghz_read_raw.h"
@@ -56,6 +57,7 @@ struct SubGhz {
     SubGhzNotificationState state_notifications;
 
     SubGhzViewReceiver* subghz_receiver;
+    SubGhzViewPocsag* subghz_pocsag;
     SubGhzViewTransmitter* subghz_transmitter;
     VariableItemList* variable_item_list;
 
@@ -67,6 +69,7 @@ struct SubGhz {
     SubGhzLock lock;
     SubGhzThresholdRssi* threshold_rssi;
     SubGhzRxKeyState rx_key_state;
+    SubGhzRxKeyState pocsag_rx_key_state;
     SubGhzHistory* history;
     uint16_t idx_menu_chosen;
     SubGhzLoadTypeFile load_type_file;

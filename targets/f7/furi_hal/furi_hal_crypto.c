@@ -139,6 +139,19 @@ bool furi_hal_crypto_enclave_verify(uint8_t* keys_nb, uint8_t* valid_keys_nb) {
             keys++;
             if(furi_hal_crypto_encrypt(
                    enclave_signature_input[key_slot], buffer, ENCLAVE_SIGNATURE_SIZE)) {
+                if(key_slot == 0) {
+                    FURI_LOG_I(
+                        TAG,
+                        "slot1 fingerprint: %02X %02X %02X %02X %02X %02X %02X %02X",
+                        buffer[0],
+                        buffer[1],
+                        buffer[2],
+                        buffer[3],
+                        buffer[4],
+                        buffer[5],
+                        buffer[6],
+                        buffer[7]);
+                }
                 keys_valid +=
                     memcmp(buffer, enclave_signature_expected[key_slot], ENCLAVE_SIGNATURE_SIZE) ==
                     0;

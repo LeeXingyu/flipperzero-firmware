@@ -112,7 +112,6 @@ PluginManagerError plugin_manager_load_all(PluginManager* manager, const char* p
     FuriString* file_name = furi_string_alloc();
     do {
         if(!storage_dir_open(directory, path)) {
-            FURI_LOG_E(TAG, "Failed to open directory %s", path);
             break;
         }
         while(true) {
